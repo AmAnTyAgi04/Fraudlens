@@ -1,1 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FraudLens – Financial Fraud Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f2f5f8;--card:#fff;--ink:#10243b;--mute:#5b6b7c;--line:#d7dee6;--ok:#0e7c86;--mid:#b97a00;--bad:#c8372d;--acc:#10243b;--onacc:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#0b1520;--card:#122131;--ink:#e6edf4;--mute:#93a4b5;--line:#243649;--ok:#35b9c4;--mid:#e2a62b;--bad:#ef6a60;--acc:#e6edf4;--onacc:#0b1520}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Instrument Sans",system-ui,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:22px 18px 56px}
+h1,h2{font-family:"Bricolage Grotesque",system-ui,sans-serif;line-height:1.1;margin:0}
+h1{font-size:clamp(28px,4.5vw,42px);font-weight:800;letter-spacing:-.02em}h2{font-size:21px;font-weight:800;margin-bottom:10px}
+.sub{color:var(--mute);margin:6px 0 4px}#status{font-size:13px;color:var(--mute);margin-bottom:14px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.tab,.b{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 15px;border-radius:999px;cursor:pointer}
+.tab[aria-selected="true"],.b.p{background:var(--acc);color:var(--onacc);border-color:var(--acc)}
+.b{border-radius:8px;background:var(--bg)}.b.p{background:var(--acc)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--ok);outline-offset:2px}
+.view{display:none}.view.on{display:block}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.kpi b{display:block;font:800 32px/1.1 "Bricolage Grotesque",sans-serif}.kpi span{color:var(--mute);font-size:14px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:820px){.g2{grid-template-columns:1fr}}
+canvas{width:100%;height:220px;display:block}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)}th{color:var(--mute);font-weight:600}
+.scroll{overflow-x:auto}.tag{font-weight:600}.ok{color:var(--ok)}.mid{color:var(--mid)}.bad{color:var(--bad)}
+.f{display:grid;gap:3px;margin-bottom:10px}.f label{font-weight:600;font-size:14px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+textarea{min-height:120px;font-family:ui-monospace,monospace;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.pct{font:800 60px/1 "Bricolage Grotesque",sans-serif;letter-spacing:-.03em}
+.bar{display:grid;grid-template-columns:140px 1fr 46px;gap:8px;align-items:center;font-size:14px;margin-bottom:7px}
+.bar i{display:block;height:10px;border-radius:5px;background:var(--bad)}.bar span:last-child{color:var(--mute);text-align:right}
+.cm{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;text-align:center;font-size:14px}.cm div{padding:10px;border-radius:8px;background:var(--bg)}
+.mute{color:var(--mute);font-size:14px}code{background:var(--bg);padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>FraudLens</h1>
+<p class="sub">Credit card fraud detection with machine learning. Every score on this page comes from the Python backend.</p>
+<div id="status">Connecting to backend…</div>
+<div class="tabs" id="tabs" role="tablist"></div>
+
+<div class="view on" id="v-dash">
+  <div class="kpis">
+    <div class="panel kpi"><b id="k1">0</b><span>Transactions screened</span></div>
+    <div class="panel kpi"><b id="k2" class="bad">0</b><span>Flagged</span></div>
+    <div class="panel kpi"><b id="k3">0%</b><span>Flag rate</span></div>
+    <div class="panel kpi"><b id="k4">–</b><span>Model recall (test set)</span></div>
+  </div>
+  <div class="g2">
+    <div class="panel"><h2>Fraud cases by hour</h2><canvas id="c-hour"></canvas></div>
+    <div class="panel"><h2>Live transaction feed</h2><div class="row" style="margin:0 0 8px"><button class="b" id="pause">Pause</button></div>
+      <div class="scroll"><table><thead><tr><th>Amount</th><th>Hour</th><th>Risk</th><th>Decision</th></tr></thead><tbody id="feed"></tbody></table></div></div>
+  </div>
+</div>
+
+<div class="view" id="v-scan"><div class="g2">
+  <div class="panel"><h2>Check one transaction</h2><div id="fields"></div>
+    <div class="row"><button class="b p" id="run">Check risk</button><button class="b" id="ex1">Normal example</button><button class="b" id="ex2">Suspicious example</button></div></div>
+  <div class="panel"><h2>Result</h2><div class="pct" id="pct">–</div><p id="verdict" class="mute">Enter details and press Check risk.</p>
+    <h2 style="font-size:16px;margin:12px 0 8px">What pushed the score up</h2><div id="why"></div></div>
+</div></div>
+
+<div class="view" id="v-batch"><div class="panel">
+  <h2>Score many transactions</h2>
+  <p class="mute">Paste CSV rows or choose a file. Columns: amount, hour, distance_km, tx_last_24h, online (0/1), new_merchant (0/1).</p>
+  <textarea id="csv">amount,hour,distance_km,tx_last_24h,online,new_merchant
+1200,13,3,1,0,0
+48000,3,410,12,1,1
+900,19,6,2,1,0
+26000,2,150,8,1,1
+3500,11,12,3,0,0</textarea>
+  <div class="row"><input type="file" id="file" accept=".csv" style="max-width:260px"><button class="b p" id="score">Score transactions</button></div>
+  <p id="bsum" class="mute"></p>
+  <div class="scroll"><table><thead><tr><th>Amount</th><th>Hour</th><th>Distance</th><th>Risk</th><th>Decision</th></tr></thead><tbody id="bbody"></tbody></table></div>
+</div></div>
+
+<div class="view" id="v-model">
+  <div class="kpis" id="mk"></div>
+  <div class="g2">
+    <div class="panel"><h2>ROC curve</h2><canvas id="c-roc"></canvas></div>
+    <div class="panel"><h2>Confusion matrix</h2><div class="cm" id="cm"></div><h2 style="margin-top:18px">Feature weights</h2><div id="wts"></div></div>
+  </div>
+</div>
+
+<div class="view" id="v-api"><div class="panel"><h2>API</h2>
+  <p class="mute">Interactive docs: <a href="/docs">/docs</a><br><br>
+  <code>GET /api/health</code> service status<br><code>GET /api/metrics</code> model metrics<br><code>POST /api/predict</code> score one transaction<br>
+  <code>POST /api/batch</code> score many<br><code>GET /api/simulate</code> random scored transaction (feeds the live dashboard)</p></div></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id),css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const api=(p,o)=>fetch(p,o).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json()});
+const post=(p,b)=>api(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});
+const cls=d=>({approve:"ok",review:"mid",block:"bad"}[d]),cap=d=>d[0].toUpperCase()+d.slice(1),inr=n=>"₹"+Number(n).toLocaleString("en-IN");
+let M=null,paused=false,seen=0,flag=0;
+
+function bars(cv,labels,vals){const d=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;if(!w)return;cv.width=w*d;cv.height=h*d;const c=cv.getContext("2d");c.scale(d,d);
+ const m=Math.max(...vals,1),bw=(w-20)/vals.length;c.fillStyle=css("--bad");vals.forEach((v,i)=>{const bh=(h-30)*v/m;c.fillRect(10+i*bw+2,h-20-bh,bw-4,bh)});
+ c.fillStyle=css("--mute");c.font="11px sans-serif";labels.forEach((l,i)=>{if(i%3==0)c.fillText(l,10+i*bw,h-5)})}
+function rocDraw(){const cv=$("c-roc"),d=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;if(!w||!M)return;cv.width=w*d;cv.height=h*d;const c=cv.getContext("2d");c.scale(d,d);
+ c.strokeStyle=css("--line");c.strokeRect(30,10,w-40,h-40);c.beginPath();c.moveTo(30,h-30);c.lineTo(w-10,10);c.stroke();
+ c.strokeStyle=css("--ok");c.lineWidth=2.5;c.beginPath();M.roc.forEach(([x,y],i)=>{const px=30+x*(w-40),py=h-30-y*(h-40);i?c.lineTo(px,py):c.moveTo(px,py)});c.stroke();
+ c.fillStyle=css("--mute");c.font="11px sans-serif";c.fillText("False positive rate",w/2-40,h-8);c.fillText("AUC "+M.auc.toFixed(3),w-90,h-40)}
+function draw(){if(!M)return;bars($("c-hour"),M.fraud_by_hour.map((_,i)=>i+"h"),M.fraud_by_hour);rocDraw()}
+
+[["dash","Dashboard"],["scan","Scanner"],["batch","Batch upload"],["model","Model"],["api","API"]].forEach(([k,l],i)=>{const b=document.createElement("button");b.className="tab";b.textContent=l;b.role="tab";b.setAttribute("aria-selected",i==0);
+ b.onclick=()=>{document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected",t==b));document.querySelectorAll(".view").forEach(v=>v.classList.toggle("on",v.id=="v-"+k));draw()};$("tabs").appendChild(b)});
+
+const F=[["amount","Amount (₹)",2500],["hour","Hour (0–23)",14],["distance_km","Distance from home (km)",5],["tx_last_24h","Transactions in last 24 hours",2],["online","Online payment",0],["new_merchant","First time at this merchant",0]];
+$("fields").innerHTML=F.map(([id,l,v],i)=>i>3?`<div class="f"><label for="${id}">${l}</label><select id="${id}"><option value="0">No</option><option value="1">Yes</option></select></div>`:`<div class="f"><label for="${id}">${l}</label><input id="${id}" type="number" min="0" value="${v}"></div>`).join("");
+const setv=a=>F.forEach(([id],i)=>$(id).value=a[i]),read=()=>Object.fromEntries(F.map(([id])=>[id,Number($(id).value)||0]));
+$("ex1").onclick=()=>{setv([1800,13,4,2,0,0]);scan()};$("ex2").onclick=()=>{setv([42000,3,380,11,1,1]);scan()};$("run").onclick=scan;
+async function scan(){try{const r=await post("/api/predict",read()),p=r.fraud_probability,c=cls(r.decision),m=Math.max(...r.factors.map(x=>x.contribution),.01);
+ $("pct").textContent=Math.round(p*100)+"%";$("pct").className="pct "+c;
+ $("verdict").innerHTML=`<b class="${c}">${cap(r.decision)}</b>: ${r.decision=="approve"?"this looks normal.":r.decision=="review"?"a person should check this.":"this looks like fraud."}`;
+ $("why").innerHTML=r.factors.length?r.factors.map(x=>`<div class="bar"><span>${x.name}</span><i style="width:${x.contribution/m*100}%"></i><span>+${x.contribution}</span></div>`).join(""):'<span class="mute">No factor raised the score.</span>'}
+ catch(e){$("verdict").textContent="Could not reach the backend. Check the server and try again."}}
+
+function parse(t){return t.trim().split(/\r?\n/).map(l=>l.split(",").map(Number)).filter(a=>a.length>=6&&a.every(v=>!isNaN(v))).map(a=>({amount:a[0],hour:a[1],distance_km:a[2],tx_last_24h:a[3],online:a[4],new_merchant:a[5]}))}
+async function batch(t){const rows=parse(t);if(!rows.length){$("bsum").textContent="No valid rows found. Check the column order.";return}
+ try{const r=await post("/api/batch",{rows});$("bsum").textContent=`${r.count} transactions scored, ${r.flagged} need review or are blocked.`;
+ $("bbody").innerHTML=r.results.map(x=>`<tr><td>${inr(x.amount)}</td><td>${x.hour}h</td><td>${x.distance_km} km</td><td>${Math.round(x.fraud_probability*100)}%</td><td class="tag ${cls(x.decision)}">${cap(x.decision)}</td></tr>`).join("")}
+ catch(e){$("bsum").textContent="Could not score these rows. Check the values and try again."}}
+$("score").onclick=()=>batch($("csv").value);
+$("file").onchange=e=>{const fr=new FileReader();fr.onload=()=>{$("csv").value=fr.result;batch(fr.result)};if(e.target.files[0])fr.readAsText(e.target.files[0])};
+
+$("pause").onclick=()=>{paused=!paused;$("pause").textContent=paused?"Resume":"Pause"};
+setInterval(async()=>{if(paused||!M)return;try{const s=await api("/api/simulate");seen++;if(s.decision!="approve")flag++;
+ $("k1").textContent=seen;$("k2").textContent=flag;$("k3").textContent=(flag/seen*100).toFixed(1)+"%";
+ $("feed").insertAdjacentHTML("afterbegin",`<tr><td>${inr(s.txn.amount)}</td><td>${s.txn.hour}h</td><td>${Math.round(s.fraud_probability*100)}%</td><td class="tag ${cls(s.decision)}">${cap(s.decision)}</td></tr>`);
+ while($("feed").rows.length>8)$("feed").deleteRow(-1)}catch(e){}},1200);
+
+api("/api/metrics").then(m=>{M=m;$("status").textContent="Connected to backend";
+ $("k4").textContent=Math.round(m.recall*100)+"%";
+ $("mk").innerHTML=[["Accuracy",m.accuracy],["Precision",m.precision],["Recall",m.recall],["F1 score",m.f1]].map(([n,v])=>`<div class="panel kpi"><b>${(v*100).toFixed(1)}%</b><span>${n}</span></div>`).join("")+`<div class="panel kpi"><b>${m.auc.toFixed(3)}</b><span>ROC-AUC</span></div>`;
+ const c=m.confusion;$("cm").innerHTML=`<span></span><b>Predicted normal</b><b>Predicted fraud</b><b>Actually normal</b><div>${c.tn}</div><div>${c.fp}</div><b>Actually fraud</b><div>${c.fn}</div><div>${c.tp}</div>`;
+ const mw=Math.max(...m.weights.map(w=>Math.abs(w.weight)));$("wts").innerHTML=m.weights.map(w=>`<div class="bar"><span>${w.name}</span><i style="width:${Math.abs(w.weight)/mw*100}%;background:${w.weight>0?"var(--bad)":"var(--ok)"}"></i><span>${w.weight.toFixed(1)}</span></div>`).join("");
+ draw();scan()}).catch(()=>{$("status").textContent="Cannot reach the backend. Start the server and reload this page."});
+addEventListener("resize",draw);
+</script>
+</body>
+</html>
 
